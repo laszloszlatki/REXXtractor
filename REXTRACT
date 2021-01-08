@@ -1,0 +1,85 @@
+/* REXX                                                                  */
+/*************************************************************************/
+/*                                                                       */
+/*    THIS PROGRAM READS THE DATASET PASSED IN  (I.E. IMS MAP OUTPUT)    */
+/*    AND RETRIEVES RECORDS FOLLOWING THE SEARCH CRITERIA                */
+/*                                                                       */
+/*                                                                       */
+/*    VALUES TO BE PASSED IN FROM JCL ARE:                               */
+/*    - SEARCH:  CONTAINS THE STRING TO BE SEARCHED FOR                  */
+/*    - RECLNGT: THE LENGTH OF RECORD TO BE RETRIEVED                    */
+/*               EXCLUDING THE KEYWORD. ENTIRE WORD IF SHORTER           */
+/*    - DIVIDER: CHARACTER WHAT DIVIDES WORDS IN THE INPUT DATASET       */
+/*                I.E. ' , ' IN A CSV INPUT                              */
+/*    - INCLUDE: RESULT CONTAINS THE SEARCH TERM OR NOT                  */
+/*               I.E. 'DB=ABCD1234' OR 'ABCD1234' - SEARCH WORD IS 'DB=' */
+/*                                                                       */
+/*    LASZLO SZLATKI (Z00239)   19/12/2020   ORIGINAL VERSION            */
+/*                                                                       */
+/*    LASZLO SZLATKI (Z00239)   04/01/2021                               */
+/*     OPTION TO INCLUDE SEARCH CRITERIA IN THE RESULT STRING ADDED      */
+/*                                                                       */
+/*************************************************************************/
+
+/* RECEIVE, SAVE AND VALIDATE VARIABLE VALUES PASSED FROM JCL            */
+ARG INPARMS
+SAY 'ARGUMENT IS: ' INPARMS
+PARSE VAR INPARMS SEARCH RECLNGT DIVIDER INCLUDE
+
+IF DATATYPE(RECLNGT) ^= "NUM" THEN
+RECLNGT = 132
+IF WORDLENGTH(DIVIDER,1) = 0 THEN
+DIVIDER = ' '
+
+/* INITIALIZE COUNTERS                                                   */
+I = 1                                     /* INPUT LINE COUNTER          */
+J = 1                                     /* OUTPUT RECORD COUNTER       */
+K = 1                                     /* DUPLICATE CHECK COUNTER     */
+SRCLNGT = WORDLENGTH(SEARCH,1)            /* LENGTH OF SEARCH CRITERIA   */
+SAY 'SRCLNGT IS:' SRCLNGT
+IF INCLUDE = 'Y' THEN
+DO
+  SRTPOS = 1                              /* RECORD STARTING POSITION    */
+  RECLNGT = SRCLNGT + RECLNGT             /* RECORD INCLUDES SEARCH TERM */
+END
+ELSE
+  SRTPOS = SRCLNGT + 1                    /* RECORD STARTING POSITION    */
+
+/* FIND SEARCHED KEYWORD IN INPUT DATASET                                */
+"EXECIO * DISKR INDATA (STEM LINE. FINIS" /* READ ALL LINES TO ARRAY     */
+DO I = 1 TO LINE.0                        /* READ EACH LINE FROM ARRAY   */
+  LINE.I = TRANSLATE(LINE.I,' ',DIVIDER)  /* REPLACE DIVIDER WITH SPACE  */
+  IX = INDEX(LINE.I, SEARCH)              /* INDEX OF SEARCH CRITERIA    */
+  IF IX ^= 0 THEN                    /* IF FOUND, READ LINE WORD BY WORD */
+  DO
+    TMPREC = LINE.I
+    DO WHILE TMPREC <> ''                 /* READ TEMP UNTIL LAST WORD   */
+       PARSE VAR TMPREC WORD TMPREC       /* GET FIRT WORD FROM TEMP     */
+       SRCHINDEX = INDEX(WORD, SEARCH)    /* INDEX OF SEARCHED KEYWORD   */
+       IF SRCHINDEX ^= 0 THEN
+       DO
+         REC = SUBSTR(WORD,SRTPOS,RECLNGT) /* GET RECORD FROM WORD      */
+         IF WORDLENGTH(REC,1) ^= 0 THEN
+         DO
+         /* CHECK IF CURRENT RECORD IS ALREADY IN THE ARRAY             */
+         CONTENT_FOUND = 'N'
+            DO K = 1 TO J               /* J = CONTENT COUNT IN ARRAY   */
+              IF REC = RECORD.K THEN
+              DO
+                CONTENT_FOUND= 'Y'
+                K = J + 1
+              END
+            END
+            IF CONTENT_FOUND = 'N' THEN
+            DO                          /* IF NOT FOUND, ADD TO ARRAY   */
+              RECORD.J = REC
+              J = J + 1
+            END
+         END
+       END
+    END
+  END
+END
+
+/* WRITE UNIQUE RECORDS FROM ARRAY TO THE OUTPUT DATASET                */
+"EXECIO * DISKW OUTDATA (STEM RECORD."
