@@ -1,0 +1,69 @@
+//Z00239RX JOB
+//*/*****************************************************************
+//*                                                                 *
+//*    This JCL is the driver for the REXTRACT script               *
+//*                                                                 *
+//*                                                                 *
+//*    LASZLO SZLATKI (Z00239)   19/12/2020   ORIGINAL VERSION      *
+//*                                                                 *
+//* Remove ID from dataset names to simplify running by other users *
+//* Addition of the INCLUDE parameter                               *
+//*    LASZLO SZLATKI (Z00239)   04/01/2021                         *
+//*                                                                 *
+//*******************************************************************
+//*
+//*******************************************************************
+//*                                                                 *
+//*            SETTING VALUES FOR THE VARIABLES                     *
+//*                                                                 *
+//*                                                                 *
+//* KEYWORD - CONTAINS THE STRING TO BE SEARCHED                    *
+//*                                                                 *
+//* RECLNGT - LENGTH OF RECORD TO BE RETRIEVED AFTER THE            *
+//*           SEACH CRITERIA, OR THE FULL WORD IF SHORTER           *
+//*                                                                 *
+//* DIVIDER - CHARACTER WHAT DEVIDES WORDS IN THE INPUT DATASET     *
+//*           SPACE IS ALWAYS ASSUMED                               *
+//*                                                                 *
+//* INCLUDE - INCLUDE THE KEYWORD IN THE RESULT (Y)                 *
+//*           OR ONLY RETRIEVE THE CHARACTERS THAT FOLLOW TERM (N)  *
+//*                                                                 *
+//*******************************************************************
+//*
+//         SET KEYWORD='DB='        /* SEARCH CRITERIA */
+//         SET RECLNGT=8       /* RECORD LENGTH TO BE RETRIEVED */
+//         SET DIVIDER=','     /* DIVIDING CHARACTER */
+//         SET INCLUDE='Y'     /* IS SEARCH TERM PART OF RESULT? */
+//*
+//***************************************
+//*                                     *
+//*   DELETE OUTPUT DATASET IF EXISTS   *
+//*                                     *
+//***************************************
+//*
+//JS010   EXEC PGM=IEFBR14
+//*
+//SYSPRINT  DD SYSOUT=*                       SYSTEM OUTPUT MESSAGES
+//DELETEDD  DD DSN=&SYSUID..GRANDCH.OUTPUT,
+//             DISP=(MOD,DELETE,DELETE),
+//             SPACE=(10796,(375,75),RLSE),
+//             DCB=(LRECL=133,RECFM=FBA,DSORG=PS,BLKSIZE=0)
+//*
+//*************************************************************
+//*                                                           *
+//*   CALL REXX SCRIPT TO EXTRACT RECORDS FROM INPUT DATASET  *
+//*                                                           *
+//*************************************************************
+//*
+//JS020   EXEC PGM=IKJEFT01,
+//        PARM='REXTRACT &KEYWORD &RECLNGT &DIVIDER &INCLUDE'
+//*
+//SYSEXEC   DD DISP=SHR,DSN=&SYSUID..GRANDCH.SRC    REXX SRC LIB
+//INDATA    DD DSN=&SYSUID..GRANDCH.SRC(INPUT),     INPUT DATASET
+//             DISP=(SHR,KEEP,KEEP)
+//OUTDATA   DD DSN=&SYSUID..GRANDCH.OUTPUT,         OUTPUT DATASET
+//             DISP=(NEW,CATLG,DELETE),
+//             SPACE=(10796,(375,75),RLSE),
+//             DCB=(LRECL=133,RECFM=FBA,DSORG=PS,BLKSIZE=0)
+//SYSTSIN   DD DUMMY
+//SYSTSPRT  DD SYSOUT=*                           OUTPUT MESSAGES
